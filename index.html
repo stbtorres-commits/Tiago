@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PhotoClean — Contrôle des doublons</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #F7F6F2;
+      --surface: #FFFFFF;
+      --surface2: #F0EFE9;
+      --border: rgba(0,0,0,0.10);
+      --border-strong: rgba(0,0,0,0.18);
+      --text: #1A1A18;
+      --text-muted: #6B6B66;
+      --text-hint: #9E9E98;
+      --accent: #1D5FA8;
+      --accent-light: #E3EEFA;
+      --accent-text: #0C3F77;
+      --danger: #A32D2D;
+      --danger-light: #FCEBEB;
+      --danger-text: #791F1F;
+      --success: #2D6B3A;
+      --success-light: #E8F5EB;
+      --warning: #8A5B0A;
+      --warning-light: #FEF3DC;
+      --radius: 10px;
+      --radius-lg: 14px;
+      --radius-xl: 20px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 1.5rem;
+      display: flex;
+      align-items: center;
+      height: 58px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      font-size: 17px;
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .header-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    main {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    .page-title {
+      font-size: 26px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .page-sub {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin-bottom: 2rem;
+    }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2px dashed var(--border-strong);
+      border-radius: var(--radius-xl);
+      padding: 3rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.18s;
+      background: var(--surface);
+      position: relative;
+    }
+
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--accent);
+      background: var(--accent-light);
+    }
+
+    .drop-icon {
+      width: 56px;
+      height: 56px;
+      background: var(--accent-light);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      font-size: 26px;
+    }
+
+    .drop-zone h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .drop-zone p {
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .drop-zone .formats {
+      margin-top: 12px;
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .format-pill {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: 99px;
+      background: var(--surface2);
+      color: var(--text-muted);
+      font-family: 'DM Mono', monospace;
+    }
+
+    #file-input { display: none; }
+
+    /* Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin: 1.5rem 0;
+    }
+
+    @media (max-width: 560px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 14px 16px;
+    }
+
+    .stat-val {
+      font-size: 24px;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+
+    .stat-lbl {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    .stat-card.highlight { background: var(--accent-light); border-color: rgba(29,95,168,0.2); }
+    .stat-card.highlight .stat-val { color: var(--accent-text); }
+
+    /* Progress */
+    .progress-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px 20px;
+      margin-bottom: 1.5rem;
+    }
+
+    .progress-label {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .progress-bar {
+      height: 5px;
+      background: var(--surface2);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 99px;
+      transition: width 0.3s ease;
+    }
+
+    /* Toolbar */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .section-label {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+
+    .spacer { flex: 1; }
+
+    /* Chips */
+    .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+
+    .chip {
+      font-size: 12px;
+      font-weight: 500;
+      padding: 4px 12px;
+      border-radius: 99px;
+      border: 1px solid var(--border-strong);
+      background: var(--surface);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+
+    .chip:hover { border-color: var(--accent); color: var(--accent); }
+
+    .chip.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    /* Buttons */
+    .btn {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 7px 14px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border-strong);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.12s;
+      white-space: nowrap;
+    }
+
+    .btn:hover { background: var(--surface2); }
+    .btn:active { transform: scale(0.98); }
+
+    .btn.primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    .btn.primary:hover { background: var(--accent-text); }
+
+    .btn.danger {
+      background: var(--danger);
+      color: #fff;
+      border-color: var(--danger);
+    }
+
+    .btn.danger:hover { background: var(--danger-text); }
+
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Group cards */
+    .group-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      margin-bottom: 12px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .group-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+      gap: 10px;
+    }
+
+    .group-header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .group-num {
+      font-size: 12px;
+      font-weight: 500;
+      font-family: 'DM Mono', monospace;
+      color: var(--text-muted);
+      min-width: 24px;
+    }
+
+    .group-title { font-size: 14px; font-weight: 600; }
+
+    .badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 99px;
+    }
+
+    .badge.exact { background: var(--danger-light); color: var(--danger-text); }
+    .badge.similar { background: var(--warning-light); color: var(--warning); }
+
+    .chevron {
+      width: 16px;
+      height: 16px;
+      color: var(--text-hint);
+      transition: transform 0.2s;
+      flex-shrink: 0;
+    }
+
+    .chevron.open { transform: rotate(180deg); }
+
+    .photos-grid {
+      display: flex;
+      gap: 10px;
+      padding: 14px 16px;
+      flex-wrap: wrap;
+    }
+
+    .photo-item {
+      position: relative;
+      cursor: pointer;
+      border-radius: 8px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .photo-item img {
+      width: 96px;
+      height: 96px;
+      object-fit: cover;
+      display: block;
+      border: 2.5px solid transparent;
+      border-radius: 8px;
+      transition: border-color 0.12s;
+    }
+
+    .photo-item.selected img { border-color: var(--accent); }
+    .photo-item.keep img { border-color: var(--success); }
+
+    .photo-meta {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 4px 6px;
+      background: linear-gradient(transparent, rgba(0,0,0,0.6));
+      border-radius: 0 0 6px 6px;
+    }
+
+    .photo-name {
+      font-size: 9px;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
+    }
+
+    .photo-size {
+      font-size: 9px;
+      color: rgba(255,255,255,0.75);
+      font-family: 'DM Mono', monospace;
+    }
+
+    .photo-check {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--accent);
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .photo-item.selected .photo-check { display: flex; }
+
+    .photo-check svg { width: 11px; height: 11px; stroke: #fff; fill: none; stroke-width: 2.5; }
+
+    .keep-badge {
+      position: absolute;
+      top: 5px;
+      left: 5px;
+      background: var(--success);
+      color: #fff;
+      font-size: 9px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .group-actions {
+      display: flex;
+      gap: 8px;
+      padding: 0 16px 14px;
+      flex-wrap: wrap;
+    }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--text-muted);
+    }
+
+    .empty-icon { font-size: 40px; margin-bottom: 12px; }
+    .empty-state h3 { font-size: 17px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+    .empty-state p { font-size: 14px; }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(10px);
+      background: #1A1A18;
+      color: #F7F6F2;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 9px 20px;
+      border-radius: 99px;
+      opacity: 0;
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none;
+      z-index: 100;
+      white-space: nowrap;
+    }
+
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* Actions bar */
+    .actions-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    /* Separator */
+    .sep {
+      height: 1px;
+      background: var(--border);
+      margin: 1.5rem 0;
+    }
+
+    /* Info banner */
+    .info-banner {
+      background: var(--accent-light);
+      border: 1px solid rgba(29,95,168,0.2);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      font-size: 13px;
+      color: var(--accent-text);
+      margin-bottom: 1.5rem;
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
+
+    .info-banner svg { flex-shrink: 0; margin-top: 1px; }
+
+    @media (max-width: 480px) {
+      main { padding: 1.25rem 1rem 3rem; }
+      .page-title { font-size: 22px; }
+      .photo-item img { width: 80px; height: 80px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🧹</div>
+    PhotoClean
+  </div>
+  <div class="header-right">
+    <button class="btn" id="btn-reset" style="display:none;" onclick="resetAll()">Réinitialiser</button>
+  </div>
+</header>
+
+<main>
+  <h1 class="page-title">Contrôle des doublons</h1>
+  <p class="page-sub">Importez vos photos pour détecter et supprimer les doublons automatiquement.</p>
+
+  <div id="upload-section">
+    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <div class="drop-icon">🖼️</div>
+      <h3>Cliquez ou déposez vos photos ici</h3>
+      <p>Sélectionnez plusieurs photos depuis votre appareil</p>
+      <div class="formats">
+        <span class="format-pill">JPG</span>
+        <span class="format-pill">PNG</span>
+        <span class="format-pill">WEBP</span>
+        <span class="format-pill">HEIC</span>
+        <span class="format-pill">GIF</span>
+      </div>
+    </div>
+    <input type="file" id="file-input" multiple accept="image/*">
+  </div>
+
+  <div id="stats-section" style="display:none;">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-val" id="stat-total">0</div>
+        <div class="stat-lbl">Photos importées</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="stat-groups">0</div>
+        <div class="stat-lbl">Groupes détectés</div>
+      </div>
+      <div class="stat-card highlight">
+        <div class="stat-val" id="stat-dups">0</div>
+        <div class="stat-lbl">Doublons trouvés</div>
+      </div>
+      <div class="stat-card highlight">
+        <div class="stat-val" id="stat-size">0 Ko</div>
+        <div class="stat-lbl">Espace récupérable</div>
+      </div>
+    </div>
+
+    <div class="progress-wrap" id="progress-area" style="display:none;">
+      <div class="progress-label" id="progress-label">Analyse en cours…</div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="results-section" style="display:none;">
+    <div class="info-banner">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+        <circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="5.5"/><line x1="8" y1="7.5" x2="8" y2="11"/>
+      </svg>
+      <span>La première photo de chaque groupe est automatiquement conservée. Sélectionnez les doublons à supprimer, puis confirmez.</span>
+    </div>
+
+    <div class="toolbar">
+      <span class="section-label">Groupes détectés</span>
+      <div class="spacer"></div>
+      <div class="chips">
+        <span class="chip active" data-filter="all">Tous</span>
+        <span class="chip" data-filter="exact">Exacts</span>
+        <span class="chip" data-filter="similar">Similaires</span>
+      </div>
+    </div>
+
+    <div class="actions-bar">
+      <button class="btn" onclick="selectAllDuplicates()">Sélectionner tous les doublons</button>
+      <button class="btn" onclick="clearSelection()">Tout désélectionner</button>
+      <div class="spacer"></div>
+      <button class="btn danger" onclick="deleteSelected()" id="delete-btn">
+        Supprimer la sélection
+      </button>
+    </div>
+
+    <div id="groups-container"></div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let allFiles = [];
+  let groups = [];
+  let selectedToDelete = new Set();
+  let currentFilter = 'all';
+  let objectURLs = [];
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2400);
+  }
+
+  const dz = document.getElementById('drop-zone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragover'); handleFiles(e.dataTransfer.files); });
+  document.getElementById('file-input').addEventListener('change', e => handleFiles(e.target.files));
+
+  document.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentFilter = chip.dataset.filter;
+      renderGroups();
+    });
+  });
+
+  async function handleFiles(fileList) {
+    const newFiles = Array.from(fileList).filter(f => f.type.startsWith('image/'));
+    if (!newFiles.length) { showToast('Aucune image valide trouvée'); return; }
+    allFiles = [...allFiles, ...newFiles];
+    document.getElementById('stats-section').style.display = '';
+    document.getElementById('progress-area').style.display = '';
+    document.getElementById('btn-reset').style.display = '';
+    document.getElementById('stat-total').textContent = allFiles.length;
+    await analyzeFiles();
+  }
+
+  async function analyzeFiles() {
+    const fill = document.getElementById('progress-fill');
+    const lbl = document.getElementById('progress-label');
+    groups = [];
+    selectedToDelete.clear();
+    objectURLs.forEach(u => URL.revokeObjectURL(u));
+    objectURLs = [];
+
+    const hashes = [];
+    for (let i = 0; i < allFiles.length; i++) {
+      lbl.textContent = `Analyse de la photo ${i + 1} / ${allFiles.length}…`;
+      fill.style.width = Math.round((i + 1) / allFiles.length * 65) + '%';
+      const h = await computeHash(allFiles[i]);
+      hashes.push(h);
+      await sleep(8);
+    }
+
+    lbl.textContent = 'Comparaison des photos…';
+    fill.style.width = '80%';
+    await sleep(60);
+
+    const usedExact = new Set();
+    const usedSimilar = new Set();
+
+    for (let i = 0; i < allFiles.length; i++) {
+      if (usedExact.has(i)) continue;
+      const group = [i];
+      for (let j = i + 1; j < allFiles.length; j++) {
+        if (usedExact.has(j)) continue;
+        if (hashes[i] === hashes[j]) { group.push(j); usedExact.add(j); }
+      }
+      if (group.length > 1) { usedExact.add(i); groups.push({ type: 'exact', indices: group }); }
+    }
+
+    const remaining = allFiles.map((_, i) => i).filter(i => !usedExact.has(i));
+    for (let ii = 0; ii < remaining.length; ii++) {
+      const i = remaining[ii];
+      if (usedSimilar.has(i)) continue;
+      const group = [i];
+      for (let jj = ii + 1; jj < remaining.length; jj++) {
+        const j = remaining[jj];
+        if (usedSimilar.has(j)) continue;
+        const sim = computeSimilarity(allFiles[i], allFiles[j]);
+        if (sim > 0.82) { group.push(j); usedSimilar.add(j); }
+      }
+      if (group.length > 1) { usedSimilar.add(i); groups.push({ type: 'similar', indices: group }); }
+    }
+
+    fill.style.width = '100%';
+    lbl.textContent = `Analyse terminée — ${groups.length} groupe(s) détecté(s)`;
+    await sleep(600);
+    document.getElementById('progress-area').style.display = 'none';
+
+    const dupCount = groups.reduce((s, g) => s + g.indices.length - 1, 0);
+    const dupSize = groups.reduce((s, g) => s + g.indices.slice(1).reduce((ss, idx) => ss + allFiles[idx].size, 0), 0);
+    document.getElementById('stat-groups').textContent = groups.length;
+    document.getElementById('stat-dups').textContent = dupCount;
+    document.getElementById('stat-size').textContent = formatSize(dupSize);
+
+    renderGroups();
+  }
+
+  async function computeHash(file) {
+    return new Promise(resolve => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = 16; c.height = 16;
+        c.getContext('2d').drawImage(img, 0, 0, 16, 16);
+        URL.revokeObjectURL(url);
+        resolve(c.toDataURL());
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve('err_' + Math.random()); };
+      img.src = url;
+    });
+  }
+
+  function computeSimilarity(f1, f2) {
+    const n1 = f1.name.replace(/\.[^.]+$/, '').toLowerCase();
+    const n2 = f2.name.replace(/\.[^.]+$/, '').toLowerCase();
+    let common = 0;
+    for (let i = 0; i < Math.min(n1.length, n2.length); i++) {
+      if (n1[i] === n2[i]) common++; else break;
+    }
+    const simName = common / Math.max(n1.length, n2.length, 1);
+    const simSize = 1 - Math.abs(f1.size - f2.size) / Math.max(f1.size, f2.size, 1);
+    return simName * 0.5 + simSize * 0.5;
+  }
+
+  function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' o';
+    if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' Ko';
+    return (bytes / 1024 / 1024).toFixed(1) + ' Mo';
+  }
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  function renderGroups() {
+    const container = document.getElementById('groups-container');
+    document.getElementById('results-section').style.display = '';
+    const filtered = groups.filter(g => currentFilter === 'all' || g.type === currentFilter);
+
+    if (!filtered.length) {
+      container.innerHTML = `<div class="empty-state">
+        <div class="empty-icon">✅</div>
+        <h3>Aucun doublon dans cette catégorie</h3>
+        <p>Essayez le filtre "Tous" pour voir tous les groupes détectés.</p>
+      </div>`;
+      return;
+    }
+
+    container.innerHTML = '';
+    filtered.forEach((g, gi) => {
+      const realIdx = groups.indexOf(g);
+      const card = document.createElement('div');
+      card.className = 'group-card';
+      const label = g.type === 'exact' ? 'Doublons exacts' : 'Similaires';
+
+      const photosHtml = g.indices.map((idx, pos) => {
+        const file = allFiles[idx];
+        const url = URL.createObjectURL(file);
+        objectURLs.push(url);
+        const isKeep = pos === 0;
+        const sel = selectedToDelete.has(idx) ? 'selected' : '';
+        const keepBadge = isKeep ? '<span class="keep-badge">Garder</span>' : '';
+        return `<div class="photo-item ${sel} ${isKeep ? 'keep' : ''}" onclick="toggleSelect(${idx}, ${isKeep}, this)">
+          <img src="${url}" loading="lazy" alt="${file.name}">
+          <div class="photo-meta">
+            <span class="photo-name">${file.name.length > 16 ? file.name.slice(0, 14) + '…' : file.name}</span>
+            <span class="photo-size">${formatSize(file.size)}</span>
+          </div>
+          ${keepBadge}
+          <div class="photo-check">
+            <svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg>
+          </div>
+        </div>`;
+      }).join('');
+
+      card.innerHTML = `
+        <div class="group-header" onclick="toggleGroup(this)">
+          <div class="group-header-left">
+            <span class="group-num">#${gi + 1}</span>
+            <span class="group-title">${g.indices.length} photos</span>
+            <span class="badge ${g.type}">${label}</span>
+          </div>
+          <svg class="chevron open" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+            <polyline points="4,6 8,10 12,6"/>
+          </svg>
+        </div>
+        <div class="photos-grid">${photosHtml}</div>
+        <div class="group-actions">
+          <button class="btn primary" onclick="selectDupsInGroup(${realIdx})">Sélectionner les doublons</button>
+          <button class="btn" onclick="keepBest(${realIdx})">Tout sélectionner sauf le premier</button>
+        </div>`;
+      container.appendChild(card);
+    });
+  }
+
+  function toggleGroup(header) {
+    const grid = header.nextElementSibling;
+    const actions = grid.nextElementSibling;
+    const chevron = header.querySelector('.chevron');
+    const hidden = grid.style.display === 'none';
+    grid.style.display = hidden ? '' : 'none';
+    actions.style.display = hidden ? '' : 'none';
+    chevron.classList.toggle('open', hidden);
+  }
+
+  function toggleSelect(idx, isKeep, el) {
+    if (isKeep) { showToast('Cette photo est marquée à conserver'); return; }
+    if (selectedToDelete.has(idx)) {
+      selectedToDelete.delete(idx);
+      el.classList.remove('selected');
+    } else {
+      selectedToDelete.add(idx);
+      el.classList.add('selected');
+    }
+  }
+
+  function selectAllDuplicates() {
+    groups.forEach(g => g.indices.slice(1).forEach(idx => selectedToDelete.add(idx)));
+    renderGroups();
+    showToast(`${selectedToDelete.size} photo(s) sélectionnée(s)`);
+  }
+
+  function clearSelection() {
+    selectedToDelete.clear();
+    renderGroups();
+    showToast('Sélection effacée');
+  }
+
+  function selectDupsInGroup(gi) {
+    groups[gi].indices.slice(1).forEach(i => selectedToDelete.add(i));
+    renderGroups();
+    showToast('Doublons du groupe sélectionnés');
+  }
+
+  function keepBest(gi) {
+    groups[gi].indices.slice(1).forEach(i => selectedToDelete.add(i));
+    renderGroups();
+    showToast('Doublons sélectionnés pour suppression');
+  }
+
+  function deleteSelected() {
+    if (!selectedToDelete.size) { showToast('Aucune photo sélectionnée'); return; }
+    const n = selectedToDelete.size;
+    const toRemove = [...selectedToDelete];
+    allFiles = allFiles.filter((_, i) => !toRemove.includes(i));
+    selectedToDelete.clear();
+    showToast(`${n} photo(s) retirée(s) de la session`);
+    document.getElementById('stat-total').textContent = allFiles.length;
+    if (allFiles.length > 1) {
+      document.getElementById('progress-area').style.display = '';
+      analyzeFiles();
+    } else {
+      groups = [];
+      document.getElementById('stat-groups').textContent = 0;
+      document.getElementById('stat-dups').textContent = 0;
+      document.getElementById('stat-size').textContent = '0 Ko';
+      document.getElementById('results-section').style.display = 'none';
+    }
+  }
+
+  function resetAll() {
+    allFiles = [];
+    groups = [];
+    selectedToDelete.clear();
+    objectURLs.forEach(u => URL.revokeObjectURL(u));
+    objectURLs = [];
+    document.getElementById('stats-section').style.display = 'none';
+    document.getElementById('results-section').style.display = 'none';
+    document.getElementById('btn-reset').style.display = 'none';
+    document.getElementById('file-input').value = '';
+    showToast('Application réinitialisée');
+  }
+</script>
+
+</body>
+</html>
