@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PhotoClean — Contrôle des doublons</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #F7F6F2; --surface: #FFFFFF; --surface2: #F0EFE9;
+      --border: rgba(0,0,0,0.10); --border-strong: rgba(0,0,0,0.18);
+      --text: #1A1A18; --text-muted: #6B6B66; --text-hint: #9E9E98;
+      --accent: #1D5FA8; --accent-light: #E3EEFA; --accent-text: #0C3F77;
+      --danger: #A32D2D; --danger-light: #FCEBEB; --danger-text: #791F1F;
+      --success: #2D6B3A; --warning: #8A5B0A; --warning-light: #FEF3DC;
+      --radius: 10px; --radius-lg: 14px; --radius-xl: 20px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.05);
+    }
+    body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 15px; line-height: 1.6; }
+
+    header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 1.5rem; display: flex; align-items: center; height: 58px; position: sticky; top: 0; z-index: 10; gap: 10px; }
+    .logo-wrap { position: relative; width: 36px; height: 36px; cursor: pointer; flex-shrink: 0; }
+    .logo-wrap img { width: 36px; height: 36px; object-fit: contain; border-radius: 8px; display: block; }
+    .logo-default { width: 36px; height: 36px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .logo-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.45); border-radius: 8px; display: none; align-items: center; justify-content: center; }
+    .logo-overlay span { color: #fff; font-size: 9px; font-weight: 600; }
+    .logo-wrap:hover .logo-overlay { display: flex; }
+    .app-name { font-weight: 600; font-size: 17px; }
+    .header-right { margin-left: auto; }
+    #logo-file { display: none; }
+
+    main { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    .page-title { font-size: 26px; font-weight: 600; margin-bottom: 4px; }
+    .page-sub { color: var(--text-muted); font-size: 14px; margin-bottom: 2rem; }
+
+    /* LOGO CONFIGURATOR */
+    .logo-config {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 16px 20px;
+      display: flex; align-items: center; gap: 16px; margin-bottom: 1.5rem; flex-wrap: wrap;
+    }
+    .logo-big {
+      width: 80px; height: 80px; border-radius: var(--radius-lg);
+      border: 2px dashed var(--border-strong); display: flex; align-items: center;
+      justify-content: center; overflow: hidden; cursor: pointer; transition: border-color 0.15s;
+      background: var(--surface2); flex-shrink: 0;
+    }
+    .logo-big:hover { border-color: var(--accent); }
+    .logo-big img { width: 100%; height: 100%; object-fit: contain; border-radius: calc(var(--radius-lg) - 2px); }
+    .logo-big .logo-big-placeholder { font-size: 32px; }
+    .logo-text h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .logo-text p { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
+    .logo-text-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    /* DROP ZONE */
+    .drop-zone { border: 2px dashed var(--border-strong); border-radius: var(--radius-xl); padding: 3rem 2rem; text-align: center; cursor: pointer; transition: all 0.18s; background: var(--surface); }
+    .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); background: var(--accent-light); }
+    .drop-icon { width: 56px; height: 56px; background: var(--accent-light); border-radius: 14px; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 26px; }
+    .drop-zone h3 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+    .drop-zone p { color: var(--text-muted); font-size: 13px; }
+    .formats { margin-top: 12px; display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+    .format-pill { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 99px; background: var(--surface2); color: var(--text-muted); font-family: 'DM Mono', monospace; }
+    #file-input { display: none; }
+
+    /* SENSITIVITY */
+    .sensitivity-bar { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 12px 20px; margin: 1.25rem 0; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .sensitivity-bar label { font-size: 13px; font-weight: 500; white-space: nowrap; }
+    .s-levels { display: flex; gap: 6px; }
+    .slevel { font-size: 12px; padding: 3px 12px; border-radius: 99px; border: 1px solid var(--border-strong); color: var(--text-muted); cursor: pointer; transition: all 0.12s; }
+    .slevel.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    #s-hint { font-size: 12px; color: var(--text-muted); }
+
+    /* STATS */
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 1.5rem 0; }
+    @media (max-width: 560px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px; }
+    .stat-val { font-size: 24px; font-weight: 600; }
+    .stat-lbl { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+    .stat-card.hi { background: var(--accent-light); border-color: rgba(29,95,168,0.2); }
+    .stat-card.hi .stat-val { color: var(--accent-text); }
+
+    .progress-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px 20px; margin-bottom: 1.5rem; }
+    .progress-label { font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
+    .progress-bar { height: 5px; background: var(--surface2); border-radius: 99px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--accent); border-radius: 99px; transition: width 0.3s; }
+
+    /* RESULTS */
+    .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+    .section-label { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+    .spacer { flex: 1; }
+    .chips { display: flex; gap: 6px; }
+    .chip { font-size: 12px; font-weight: 500; padding: 4px 12px; border-radius: 99px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-muted); cursor: pointer; transition: all 0.12s; }
+    .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .actions-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+    .btn { font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; padding: 7px 14px; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); cursor: pointer; transition: all 0.12s; white-space: nowrap; }
+    .btn:hover { background: var(--surface2); }
+    .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn.primary:hover { background: var(--accent-text); }
+    .btn.danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+    .btn.danger:hover { background: var(--danger-text); }
+
+    .info-banner { background: var(--accent-light); border: 1px solid rgba(29,95,168,0.2); border-radius: var(--radius); padding: 12px 16px; font-size: 13px; color: var(--accent-text); margin-bottom: 1.5rem; display: flex; gap: 8px; }
+
+    .group-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 12px; overflow: hidden; box-shadow: var(--shadow); }
+    .group-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--surface2); border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; gap: 10px; }
+    .group-header-left { display: flex; align-items: center; gap: 8px; }
+    .group-num { font-size: 12px; font-family: 'DM Mono', monospace; color: var(--text-muted); }
+    .group-title { font-size: 14px; font-weight: 600; }
+    .badge { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 99px; }
+    .badge.exact { background: var(--danger-light); color: var(--danger-text); }
+    .badge.similar { background: var(--warning-light); color: var(--warning); }
+    .sim-score { font-size: 11px; font-family: 'DM Mono', monospace; color: var(--text-muted); }
+    .chevron { width: 16px; height: 16px; color: var(--text-hint); transition: transform 0.2s; flex-shrink: 0; }
+    .chevron.open { transform: rotate(180deg); }
+
+    .photos-grid { display: flex; gap: 10px; padding: 14px 16px; flex-wrap: wrap; }
+    .photo-item { position: relative; cursor: pointer; border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+    .photo-item img { width: 96px; height: 96px; object-fit: cover; display: block; border: 2.5px solid transparent; border-radius: 8px; transition: border-color 0.12s; }
+    .photo-item.selected img { border-color: var(--accent); }
+    .photo-item.keep img { border-color: var(--success); }
+    .photo-meta { position: absolute; bottom: 0; left: 0; right: 0; padding: 4px 6px; background: linear-gradient(transparent, rgba(0,0,0,0.65)); }
+    .photo-name { font-size: 9px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+    .photo-size { font-size: 9px; color: rgba(255,255,255,0.75); font-family: 'DM Mono', monospace; }
+    .photo-check { position: absolute; top: 5px; right: 5px; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); display: none; align-items: center; justify-content: center; }
+    .photo-item.selected .photo-check { display: flex; }
+    .photo-check svg { width: 11px; height: 11px; stroke: #fff; fill: none; stroke-width: 2.5; }
+    .keep-badge { position: absolute; top: 5px; left: 5px; background: var(--success); color: #fff; font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 4px; }
+    .pct-badge { position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.6); color: #fff; font-size: 9px; padding: 1px 5px; border-radius: 4px; font-family: 'DM Mono', monospace; }
+    .group-actions { display: flex; gap: 8px; padding: 0 16px 14px; flex-wrap: wrap; }
+
+    .empty-state { text-align: center; padding: 4rem 2rem; color: var(--text-muted); }
+    .empty-icon { font-size: 40px; margin-bottom: 12px; }
+    .empty-state h3 { font-size: 17px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(10px); background: #1A1A18; color: #F7F6F2; font-size: 13px; font-weight: 500; padding: 9px 20px; border-radius: 99px; opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; z-index: 100; white-space: nowrap; }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    @media (max-width: 480px) { main { padding: 1.25rem 1rem 3rem; } .photo-item img { width: 80px; height: 80px; } }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo-wrap" id="logo-wrap" onclick="document.getElementById('logo-file').click()" title="Cliquer pour changer le logo">
+    <div class="logo-default" id="logo-default">🧹</div>
+    <img id="logo-header-img" style="display:none;" alt="Logo">
+    <div class="logo-overlay"><span>Modifier</span></div>
+  </div>
+  <span class="app-name">PhotoClean</span>
+  <input type="file" id="logo-file" accept="image/*">
+  <div class="header-right">
+    <button class="btn" id="btn-reset" style="display:none;" onclick="resetAll()">Réinitialiser</button>
+  </div>
+</header>
+
+<main>
+  <h1 class="page-title">Contrôle des doublons</h1>
+  <p class="page-sub">Importez vos photos pour détecter et supprimer les doublons automatiquement.</p>
+
+  <!-- LOGO CONFIGURATOR -->
+  <div class="logo-config">
+    <div class="logo-big" id="logo-big" onclick="document.getElementById('logo-file').click()">
+      <span class="logo-big-placeholder" id="logo-big-placeholder">🧹</span>
+      <img id="logo-big-img" style="display:none;" alt="Logo">
+    </div>
+    <div class="logo-text">
+      <h3>Logo personnalisé</h3>
+      <p>Affiché dans la barre de navigation et au-dessus de la zone d'import.<br>Sauvegardé dans votre navigateur pour les prochaines visites.</p>
+      <div class="logo-text-btns">
+        <button class="btn primary" onclick="document.getElementById('logo-file').click()">📁 Choisir une image</button>
+        <button class="btn" id="btn-remove-logo" style="display:none;" onclick="removeLogo()">🗑 Supprimer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DROP ZONE -->
+  <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+    <div class="drop-icon">🖼️</div>
+    <h3>Cliquez ou déposez vos photos ici</h3>
+    <p>Sélectionnez plusieurs photos depuis votre appareil</p>
+    <div class="formats">
+      <span class="format-pill">JPG</span>
+      <span class="format-pill">PNG</span>
+      <span class="format-pill">WEBP</span>
+      <span class="format-pill">HEIC</span>
+      <span class="format-pill">GIF</span>
+    </div>
+  </div>
+  <input type="file" id="file-input" multiple accept="image/*">
+
+  <!-- SENSITIVITY -->
+  <div class="sensitivity-bar">
+    <label>Sensibilité :</label>
+    <div class="s-levels">
+      <span class="slevel" data-val="0.99" data-hint="Seulement les copies pixel-parfaites" onclick="setSensitivity(this)">Stricte</span>
+      <span class="slevel active" data-val="0.93" data-hint="Recommandé — évite les faux positifs" onclick="setSensitivity(this)">Normale</span>
+      <span class="slevel" data-val="0.85" data-hint="Détecte aussi les photos retouchées" onclick="setSensitivity(this)">Large</span>
+    </div>
+    <span id="s-hint">Recommandé — évite les faux positifs</span>
+  </div>
+
+  <!-- STATS -->
+  <div id="stats-section" style="display:none;">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-val" id="stat-total">0</div><div class="stat-lbl">Photos importées</div></div>
+      <div class="stat-card"><div class="stat-val" id="stat-groups">0</div><div class="stat-lbl">Groupes détectés</div></div>
+      <div class="stat-card hi"><div class="stat-val" id="stat-dups">0</div><div class="stat-lbl">Doublons trouvés</div></div>
+      <div class="stat-card hi"><div class="stat-val" id="stat-size">0 Ko</div><div class="stat-lbl">Espace récupérable</div></div>
+    </div>
+    <div class="progress-wrap" id="progress-area" style="display:none;">
+      <div class="progress-label" id="progress-label">Analyse en cours…</div>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results-section" style="display:none;">
+    <div class="info-banner">
+      ℹ️ &nbsp;La première photo de chaque groupe est conservée. Le score de similarité est calculé par empreinte visuelle pixel par pixel (pHash).
+    </div>
+    <div class="toolbar">
+      <span class="section-label">Groupes détectés</span>
+      <div class="spacer"></div>
+      <div class="chips">
+        <span class="chip active" data-filter="all">Tous</span>
+        <span class="chip" data-filter="exact">Exacts</span>
+        <span class="chip" data-filter="similar">Similaires</span>
+      </div>
+    </div>
+    <div class="actions-bar">
+      <button class="btn" onclick="selectAllDuplicates()">Sélectionner tous les doublons</button>
+      <button class="btn" onclick="clearSelection()">Tout désélectionner</button>
+      <div class="spacer"></div>
+      <button class="btn danger" onclick="deleteSelected()">🗑 Supprimer la sélection</button>
+    </div>
+    <div id="groups-container"></div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ── STATE ─────────────────────────────────────────────
+  let allFiles = [], groups = [], selectedToDelete = new Set(), currentFilter = 'all', objectURLs = [];
+  let threshold = 0.93;
+
+  // ── LOGO ──────────────────────────────────────────────
+  document.getElementById('logo-file').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = ev => { localStorage.setItem('pc_logo', ev.target.result); applyLogo(ev.target.result); showToast('Logo mis à jour ✓'); };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  });
+
+  function applyLogo(src) {
+    // Header
+    document.getElementById('logo-default').style.display = 'none';
+    const hi = document.getElementById('logo-header-img');
+    hi.src = src; hi.style.display = '';
+    // Config panel
+    document.getElementById('logo-big-placeholder').style.display = 'none';
+    const bi = document.getElementById('logo-big-img');
+    bi.src = src; bi.style.display = '';
+    document.getElementById('btn-remove-logo').style.display = '';
+  }
+
+  function removeLogo() {
+    localStorage.removeItem('pc_logo');
+    document.getElementById('logo-default').style.display = '';
+    document.getElementById('logo-header-img').style.display = 'none';
+    document.getElementById('logo-big-placeholder').style.display = '';
+    document.getElementById('logo-big-img').style.display = 'none';
+    document.getElementById('btn-remove-logo').style.display = 'none';
+    showToast('Logo supprimé');
+  }
+
+  // Load saved logo on startup
+  const savedLogo = localStorage.getItem('pc_logo');
+  if (savedLogo) applyLogo(savedLogo);
+
+  // ── SENSITIVITY ───────────────────────────────────────
+  function setSensitivity(el) {
+    document.querySelectorAll('.slevel').forEach(s => s.classList.remove('active'));
+    el.classList.add('active');
+    threshold = parseFloat(el.dataset.val);
+    document.getElementById('s-hint').textContent = el.dataset.hint;
+    if (allFiles.length > 1) { document.getElementById('progress-area').style.display = ''; analyzeFiles(); }
+  }
+
+  // ── FILE INPUT ────────────────────────────────────────
+  const dz = document.getElementById('drop-zone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragover'); handleFiles(e.dataTransfer.files); });
+  document.getElementById('file-input').addEventListener('change', e => handleFiles(e.target.files));
+
+  document.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentFilter = chip.dataset.filter;
+      renderGroups();
+    });
+  });
+
+  async function handleFiles(fileList) {
+    const imgs = Array.from(fileList).filter(f => f.type.startsWith('image/'));
+    if (!imgs.length) { showToast('Aucune image valide trouvée'); return; }
+    allFiles = [...allFiles, ...imgs];
+    document.getElementById('stats-section').style.display = '';
+    document.getElementById('progress-area').style.display = '';
+    document.getElementById('btn-reset').style.display = '';
+    document.getElementById('stat-total').textContent = allFiles.length;
+    await analyzeFiles();
+  }
+
+  // ── PERCEPTUAL HASH (pHash 32×32 → 1024 bits) ────────
+  async function computePHash(file) {
+    return new Promise(resolve => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const N = 32;
+        const c = document.createElement('canvas');
+        c.width = N; c.height = N;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0, N, N);
+        URL.revokeObjectURL(url);
+        const px = ctx.getImageData(0, 0, N, N).data;
+        // Grayscale
+        const gray = new Float32Array(N * N);
+        for (let i = 0; i < N * N; i++)
+          gray[i] = 0.299 * px[i*4] + 0.587 * px[i*4+1] + 0.114 * px[i*4+2];
+        // Mean threshold → bit array
+        const mean = gray.reduce((a, b) => a + b, 0) / gray.length;
+        const bits = new Uint8Array(N * N);
+        for (let i = 0; i < gray.length; i++) bits[i] = gray[i] >= mean ? 1 : 0;
+        resolve(bits);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(new Uint8Array(1024)); };
+      img.src = url;
+    });
+  }
+
+  function hammingSim(a, b) {
+    let diff = 0;
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) diff++;
+    return 1 - diff / a.length;
+  }
+
+  // ── ANALYSIS ──────────────────────────────────────────
+  async function analyzeFiles() {
+    const fill = document.getElementById('progress-fill');
+    const lbl = document.getElementById('progress-label');
+    groups = []; selectedToDelete.clear();
+    objectURLs.forEach(u => URL.revokeObjectURL(u)); objectURLs = [];
+
+    // Step 1: compute pHash for every image
+    const hashes = [];
+    for (let i = 0; i < allFiles.length; i++) {
+      lbl.textContent = `Calcul de l'empreinte visuelle ${i + 1} / ${allFiles.length}…`;
+      fill.style.width = Math.round((i + 1) / allFiles.length * 60) + '%';
+      hashes.push(await computePHash(allFiles[i]));
+      await sleep(10);
+    }
+
+    // Step 2: group by similarity
+    lbl.textContent = 'Comparaison des empreintes…';
+    fill.style.width = '80%';
+    await sleep(40);
+
+    const used = new Set();
+    for (let i = 0; i < allFiles.length; i++) {
+      if (used.has(i)) continue;
+      const members = [{ idx: i, sim: 100 }];
+      for (let j = i + 1; j < allFiles.length; j++) {
+        if (used.has(j)) continue;
+        const sim = hammingSim(hashes[i], hashes[j]);
+        if (sim >= threshold) {
+          members.push({ idx: j, sim: Math.round(sim * 100) });
+          used.add(j);
+        }
+      }
+      if (members.length > 1) {
+        used.add(i);
+        const minSim = Math.min(...members.slice(1).map(m => m.sim));
+        groups.push({ type: minSim >= 99 ? 'exact' : 'similar', members });
+      }
+    }
+
+    fill.style.width = '100%';
+    lbl.textContent = `Terminé — ${groups.length} groupe(s) trouvé(s)`;
+    await sleep(500);
+    document.getElementById('progress-area').style.display = 'none';
+
+    const dupCount = groups.reduce((s, g) => s + g.members.length - 1, 0);
+    const dupSize = groups.reduce((s, g) => s + g.members.slice(1).reduce((ss, m) => ss + allFiles[m.idx].size, 0), 0);
+    document.getElementById('stat-groups').textContent = groups.length;
+    document.getElementById('stat-dups').textContent = dupCount;
+    document.getElementById('stat-size').textContent = formatSize(dupSize);
+    renderGroups();
+  }
+
+  // ── RENDER ────────────────────────────────────────────
+  function renderGroups() {
+    const container = document.getElementById('groups-container');
+    document.getElementById('results-section').style.display = '';
+    const filtered = groups.filter(g => currentFilter === 'all' || g.type === currentFilter);
+
+    if (!filtered.length) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">✅</div><h3>Aucun doublon dans cette catégorie</h3><p>Essayez le filtre "Tous" ou ajustez la sensibilité.</p></div>`;
+      return;
+    }
+
+    container.innerHTML = '';
+    filtered.forEach((g, gi) => {
+      const realIdx = groups.indexOf(g);
+      const avgSim = Math.round(g.members.slice(1).reduce((s, m) => s + m.sim, 0) / Math.max(g.members.length - 1, 1));
+      const card = document.createElement('div');
+      card.className = 'group-card';
+
+      const photosHtml = g.members.map((m, pos) => {
+        const file = allFiles[m.idx];
+        const url = URL.createObjectURL(file);
+        objectURLs.push(url);
+        const isKeep = pos === 0;
+        const sel = selectedToDelete.has(m.idx) ? 'selected' : '';
+        return `<div class="photo-item ${sel} ${isKeep ? 'keep' : ''}" onclick="toggleSelect(${m.idx},${isKeep},this)">
+          <img src="${url}" loading="lazy" alt="${file.name}">
+          <div class="photo-meta">
+            <span class="photo-name">${file.name.length > 16 ? file.name.slice(0,14)+'…' : file.name}</span>
+            <span class="photo-size">${formatSize(file.size)}</span>
+          </div>
+          ${isKeep ? '<span class="keep-badge">Garder</span>' : `<span class="pct-badge">${m.sim}%</span>`}
+          <div class="photo-check"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>
+        </div>`;
+      }).join('');
+
+      card.innerHTML = `
+        <div class="group-header" onclick="toggleGroup(this)">
+          <div class="group-header-left">
+            <span class="group-num">#${gi+1}</span>
+            <span class="group-title">${g.members.length} photos</span>
+            <span class="badge ${g.type}">${g.type === 'exact' ? 'Exacts' : 'Similaires'}</span>
+            ${g.type === 'similar' ? `<span class="sim-score">~${avgSim}%</span>` : ''}
+          </div>
+          <svg class="chevron open" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="4,6 8,10 12,6"/></svg>
+        </div>
+        <div class="photos-grid">${photosHtml}</div>
+        <div class="group-actions">
+          <button class="btn primary" onclick="selectDupsInGroup(${realIdx})">Sélectionner les doublons</button>
+          <button class="btn" onclick="keepFirst(${realIdx})">Tout sauf le premier</button>
+        </div>`;
+      container.appendChild(card);
+    });
+  }
+
+  function toggleGroup(header) {
+    const grid = header.nextElementSibling, actions = grid.nextElementSibling;
+    const hidden = grid.style.display === 'none';
+    grid.style.display = hidden ? '' : 'none';
+    actions.style.display = hidden ? '' : 'none';
+    header.querySelector('.chevron').classList.toggle('open', hidden);
+  }
+
+  function toggleSelect(idx, isKeep, el) {
+    if (isKeep) { showToast('Cette photo est marquée à conserver'); return; }
+    selectedToDelete.has(idx) ? (selectedToDelete.delete(idx), el.classList.remove('selected')) : (selectedToDelete.add(idx), el.classList.add('selected'));
+  }
+
+  function selectAllDuplicates() {
+    groups.forEach(g => g.members.slice(1).forEach(m => selectedToDelete.add(m.idx)));
+    renderGroups(); showToast(`${selectedToDelete.size} photo(s) sélectionnée(s)`);
+  }
+
+  function clearSelection() { selectedToDelete.clear(); renderGroups(); showToast('Sélection effacée'); }
+  function selectDupsInGroup(gi) { groups[gi].members.slice(1).forEach(m => selectedToDelete.add(m.idx)); renderGroups(); showToast('Doublons du groupe sélectionnés'); }
+  function keepFirst(gi) { groups[gi].members.slice(1).forEach(m => selectedToDelete.add(m.idx)); renderGroups(); showToast('Doublons sélectionnés'); }
+
+  function deleteSelected() {
+    if (!selectedToDelete.size) { showToast('Aucune photo sélectionnée'); return; }
+    const n = selectedToDelete.size;
+    allFiles = allFiles.filter((_, i) => !selectedToDelete.has(i));
+    selectedToDelete.clear();
+    showToast(`${n} photo(s) retirée(s)`);
+    document.getElementById('stat-total').textContent = allFiles.length;
+    if (allFiles.length > 1) { document.getElementById('progress-area').style.display = ''; analyzeFiles(); }
+    else {
+      groups = [];
+      ['stat-groups','stat-dups'].forEach(id => document.getElementById(id).textContent = 0);
+      document.getElementById('stat-size').textContent = '0 Ko';
+      document.getElementById('results-section').style.display = 'none';
+    }
+  }
+
+  function resetAll() {
+    allFiles = []; groups = []; selectedToDelete.clear();
+    objectURLs.forEach(u => URL.revokeObjectURL(u)); objectURLs = [];
+    ['stats-section','results-section'].forEach(id => document.getElementById(id).style.display = 'none');
+    document.getElementById('btn-reset').style.display = 'none';
+    document.getElementById('file-input').value = '';
+    showToast('Application réinitialisée');
+  }
+
+  // ── UTILS ─────────────────────────────────────────────
+  function formatSize(b) {
+    if (b < 1024) return b + ' o';
+    if (b < 1048576) return Math.round(b/1024) + ' Ko';
+    return (b/1048576).toFixed(1) + ' Mo';
+  }
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2400);
+  }
+</script>
+</body>
+</html>
